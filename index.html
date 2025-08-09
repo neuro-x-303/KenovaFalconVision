@@ -62,9 +62,7 @@
     width:100%;
     height:100%;
     object-fit:cover;
-    transform: scaleX(-1);
-/*     transform: scaleX(1); /* mirror for a front-camera feel */
-/*     -webkit-transform: scaleX(1); */ 
+    /* NO MIRROR: removed scaleX(-1) */ /* CHANGED */
   }
 
   canvas#overlay {
@@ -167,7 +165,7 @@
     <footer class="controls">
       <div class="left-controls">
         <button class="btn start" id="startBtn">Start</button>
-        <div class="chip" id="modeChip">Mode: <span id="modeLabel">Bottle-only</span></div>
+        <div class="chip" id="modeChip">Mode: <span id="modeLabel">All objects</span></div> <!-- CHANGED -->
         <button class="btn small" id="togglePeople">Toggle People</button>
         <button class="btn small" id="calibrateBtn" title="Calibrate approximate distance">Calibrate</button>
       </div>
@@ -204,32 +202,25 @@
 
   let model = null;
   let running = false;
-  let bottleOnly = true; // initial requirement: app starts marking only bottle objects
-  let showPeople = true;  // user also wants to detect people
+  let bottleOnly = false; // CHANGED: app defaults to show ALL objects
+  let showPeople = true;
   let lastTime = performance.now();
   let fps = 0;
 
-  // For rough distance estimation:
-  // We use a simple pinhole camera model:
-  // distance (m) = (real_object_height_m * focal_px) / object_pixel_height
-  // focal_px is unknown; we use a heuristic default and allow calibration.
-  let focal_px = 800; // heuristic default; change via calibrate
-  const referenceHeights = { // typical average heights for a few classes (meters)
+  let focal_px = 800;
+  const referenceHeights = {
     'person': 1.7,
-    'bottle': 0.24, // ~24cm
+    'bottle': 0.24,
     'chair': 0.9,
     'tv': 0.5,
   };
 
-  // Load COCO-SSD model (tfjs)
   async function loadModel() {
     modelStatus.innerHTML = 'Model: <span style="color:var(--muted)">loading…</span>';
-    // cocoSsd.load() returns a detector
     model = await cocoSsd.load({base: 'lite_mobilenet_v2'});
     modelStatus.innerHTML = 'Model: <span style="color:var(--accent)">ready</span>';
   }
 
-  // Setup camera access
   async function startCamera() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -247,38 +238,30 @@
   }
 
   function resizeCanvas() {
-    // match canvas size to video display
     const rect = video.getBoundingClientRect();
     canvas.width = Math.round(rect.width);
     canvas.height = Math.round(rect.height);
   }
 
-  // draw boxes
+  // draw boxes (NO MIRROR: removed ctx.translate/scale mirror logic) -- CHANGED
   function drawDetections(dets, filterTerm) {
     ctx.clearRect(0,0,canvas.width,canvas.height);
     ctx.save();
-    // mirror to match video transform
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
+    // NO mirroring here
 
     dets.forEach(d => {
       const cls = d.class;
       const score = d.score;
-      if (score < 0.4) return; // threshold
-      // filtering logic:
+      if (score < 0.4) return;
+
+      // filtering
       if (bottleOnly && !(cls === 'bottle')) {
-        // If bottle-only mode, draw only bottles.
         if (cls !== 'person' || !showPeople) return;
       }
-      // If query filter present (like "bottle")
       if (filterTerm && !cls.includes(filterTerm)) {
         if (cls !== 'person' || !showPeople) return;
       }
 
-      // detection bounding box provided in model coords relative to video natural size.
-      // We need to scale to canvas size (video element is fit:cover so model bbox uses video width/height).
-      // model returns bbox in [x,y,width,height] relative to input image. We will scale using video element intrinsic size.
-      // Compute scale factors using video element dimensions vs model input (we approximate using video.videoWidth/video.videoHeight)
       const vw = video.videoWidth || canvas.width;
       const vh = video.videoHeight || canvas.height;
       const sx = canvas.width / vw;
@@ -290,29 +273,23 @@
       const bw = w * sx;
       const bh = h * sy;
 
-      // use square around the object as the user asked (we will draw a square with side = max(w,h))
       const side = Math.max(bw, bh);
       const cx = bx + bw/2;
       const cy = by + bh/2;
       const sx1 = cx - side/2;
       const sy1 = cy - side/2;
 
-      // choose color for bottle vs person
       let color = cls === 'bottle' ? 'rgba(126,240,255,0.95)' : (cls === 'person' ? 'rgba(255,180,120,0.95)' : 'rgba(140,200,255,0.85)');
 
-      // futuristic stroke
       ctx.lineWidth = Math.max(2, Math.round(2 * (canvas.width/800)));
-      // outer glow
       ctx.shadowColor = color;
       ctx.shadowBlur = 18;
 
-      // square border
       ctx.strokeStyle = color;
       roundRect(ctx, sx1, sy1, side, side, 6);
       ctx.stroke();
 
       ctx.shadowBlur = 0;
-      // label background
       const label = `${cls} ${(score*100|0)}%`;
       ctx.font = "600 14px Inter, Arial";
       const textW = ctx.measureText(label).width;
@@ -323,11 +300,9 @@
       ctx.fillStyle = 'rgba(2,8,10,0.7)';
       roundRectFill(ctx, labelX - 6, labelY - 14, textW + padding, 22, 6);
 
-      // label text
       ctx.fillStyle = '#eafcff';
       ctx.fillText(label, labelX, labelY + 2);
 
-      // Draw estimated distance (approx)
       const clsKey = cls in referenceHeights ? cls : null;
       if (clsKey) {
         const estimatedM = estimateDistanceMeters(referenceHeights[clsKey], bh);
@@ -340,7 +315,6 @@
     ctx.restore();
   }
 
-  // helper: rounded rect stroke
   function roundRect(ctx, x, y, w, h, r) {
     ctx.beginPath();
     ctx.moveTo(x + r, y);
@@ -355,27 +329,19 @@
     ctx.fill();
   }
 
-  // Very rough distance estimation using pinhole model:
-  // real_h_m * focal_px / pixel_h
-  // focal_px adjustable via calibration. pixel_h is bounding box pixel height (bh).
   function estimateDistanceMeters(realHeightMeters, pixelHeight) {
     if (!pixelHeight || pixelHeight < 1) return null;
-    // pixelHeight is in canvas pixels; focal_px calibrated for canvas width ~1280
     const distance = (realHeightMeters * focal_px) / pixelHeight;
     return distance;
   }
 
-  // main detection loop
   async function detectionLoop(filterTerm) {
     if (!model || !running) return;
-    // model.detect accepts video element and returns detections
     try {
       const t0 = performance.now();
-      const detections = await model.detect(video, 8); // max 8 detections for speed
+      const detections = await model.detect(video, 8);
       const t1 = performance.now();
-      // draw
       drawDetections(detections, filterTerm);
-      // fps calculation
       const now = performance.now();
       fps = Math.round(1000 / (now - lastTime));
       lastTime = now;
@@ -383,11 +349,9 @@
     } catch (err) {
       console.warn('detect err', err);
     }
-    // schedule next iteration (allow browser to breathe)
     if (running) requestAnimationFrame(() => detectionLoop(filterTerm));
   }
 
-  // Start/Stop
   startBtn.addEventListener('click', async () => {
     if (!running) {
       hint.style.display = 'none';
@@ -397,38 +361,29 @@
       running = true;
       if (!model) await loadModel();
       if (!video.srcObject) await startCamera();
-      // default: start in bottle-only highlight mode
-      bottleOnly = true;
+      bottleOnly = false; // CHANGED: default to show all
       modeLabel.textContent = bottleOnly ? 'Bottle-only' : 'All objects';
-      // start loop
       requestAnimationFrame(() => detectionLoop(null));
     } else {
       running = false;
       startBtn.textContent = 'Start';
       startBtn.classList.add('start');
-      // clear overlay
       ctx.clearRect(0,0,canvas.width,canvas.height);
       hint.style.display = '';
     }
   });
 
-  // ask/query handler
   askBtn.addEventListener('click', handleQuery);
   queryInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleQuery(); });
 
   function handleQuery() {
     const text = queryInput.value.trim().toLowerCase();
     if (!text) return;
-    // simple natural-language matching for "where is the bottle"
     if (text.includes('bottle')) {
       bottleOnly = true;
       modeLabel.textContent = 'Bottle-only (query)';
-      // keep highlighting bottles; the detection loop will highlight bottles
-      // to emphasize, show a temporary UI message
       flashMessage('Searching for bottles…');
-      // pass filterTerm to detectionLoop by running one immediate pass
       requestAnimationFrame(() => detectionLoop('bottle'));
-      // after a short time revert label if user hasn't toggled
       setTimeout(() => {
         if (bottleOnly) modeLabel.textContent = 'Bottle-only';
       }, 2500);
@@ -436,7 +391,6 @@
     }
 
     if (text.includes('where') && text.includes('person')) {
-      // user asked about people
       bottleOnly = false;
       modeLabel.textContent = 'People & objects';
       flashMessage('Searching for people…');
@@ -444,7 +398,6 @@
       return;
     }
 
-    // If the user asked something else, just show a tiny response
     flashMessage(`Query received: "${text}" — try "Where is the bottle?"`);
   }
 
@@ -454,13 +407,11 @@
     setTimeout(() => { if (hint.textContent === msg) hint.style.display = ''; }, timeout);
   }
 
-  // toggle people display
   togglePeopleBtn.addEventListener('click', () => {
     showPeople = !showPeople;
     togglePeopleBtn.textContent = showPeople ? 'People: ON' : 'People: OFF';
   });
 
-  // Calibrate focal length: user points camera at a known object of known distance and enters distance meters.
   calibrateBtn.addEventListener('click', async () => {
     const className = prompt('Calibration target class (e.g. bottle or person):', 'bottle');
     if (!className) return;
@@ -470,21 +421,18 @@
 
     alert(`Calibration: point the camera so the target ${className} fills the center of the view and press OK.`);
 
-    // take one detection after short delay
     await new Promise(r => setTimeout(r, 1200));
     if (!model) {
       flashMessage('Model not loaded. Loading now…');
       await loadModel();
     }
     const detections = await model.detect(video, 6);
-    // pick the largest matching detection
     const found = detections.filter(d => d.class === className).sort((a,b) => (b.bbox[3] || 0) - (a.bbox[3] || 0))[0];
     if (!found) {
       alert('No matching object detected. Try again and make sure the object is visible.');
       return;
     }
     const pixel_h = found.bbox[3] * (canvas.height / (video.videoHeight || canvas.height));
-    // compute focal_px = pixel_h * distance / real_height
     const real_h = referenceHeights[className] || parseFloat(prompt('Enter approx physical height in meters for this object:', '0.24'));
     if (!real_h || real_h <= 0) { alert('Invalid physical height'); return; }
     focal_px = (pixel_h * dist) / real_h;
@@ -492,15 +440,13 @@
     alert('Calibration complete — distance estimates will be more accurate.');
   });
 
-  // keep canvas in sync when video size changes
   video.addEventListener('loadeddata', resizeCanvas);
   video.addEventListener('play', resizeCanvas);
 
-  // simple helper to warm up: user may want instructions offline
   window.addEventListener('load', () => {
-    // hint is visible by default
     modelStatus.innerHTML = 'Model: <span style="color:var(--muted)">not loaded</span>';
     togglePeopleBtn.textContent = 'People: ON';
+    modeLabel.textContent = 'All objects'; // CHANGED
   });
 })();
 </script>
