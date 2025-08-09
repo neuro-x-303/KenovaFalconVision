@@ -62,8 +62,8 @@
     width:100%;
     height:100%;
     object-fit:cover;
-/*     transform: scaleX(-1); /* mirror for a front-camera feel */
-/*     -webkit-transform: scaleX(-1); */ 
+/*     transform: scaleX(1); /* mirror for a front-camera feel */
+/*     -webkit-transform: scaleX(1); */ 
   }
 
   canvas#overlay {
@@ -129,14 +129,14 @@
   /* message overlay when bottle found */
   .message {
     position:absolute;left:18px;top:18px;background:linear-gradient(90deg,#0f1012,#141619);
-    padding:10px 12px;border-radius:10px;border:5px solid rgba(255,255,255,0.03);
+    padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);
     color:var(--muted);font-weight:600;
   }
 
   /* responsive */
   @media (max-width:720px){
     .app {padding:12px}
-    .brand .title{font-size:25px}
+    .brand .title{font-size:16px}
   }
 </style>
 </head>
@@ -185,7 +185,7 @@
     </footer>
   </div>
 
-<script>
+<script> 
 (() => {
   const video = document.getElementById('cam');
   const canvas = document.getElementById('overlay');
@@ -259,6 +259,7 @@
     // mirror to match video transform
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
+
     dets.forEach(d => {
       const cls = d.class;
       const score = d.score;
@@ -311,7 +312,7 @@
 
       ctx.shadowBlur = 0;
       // label background
-      const label = ${cls} ${(score*100|0)}%;
+      const label = `${cls} ${(score*100|0)}%`;
       ctx.font = "600 14px Inter, Arial";
       const textW = ctx.measureText(label).width;
       const padding = 8;
@@ -329,7 +330,7 @@
       const clsKey = cls in referenceHeights ? cls : null;
       if (clsKey) {
         const estimatedM = estimateDistanceMeters(referenceHeights[clsKey], bh);
-        const distStr = estimatedM ? ${estimatedM.toFixed(2)} m : '—';
+        const distStr = estimatedM ? `${estimatedM.toFixed(2)} m` : '—';
         ctx.fillStyle = '#cfeef1';
         ctx.fillText(distStr, labelX, labelY + 18);
       }
@@ -377,7 +378,7 @@
       const now = performance.now();
       fps = Math.round(1000 / (now - lastTime));
       lastTime = now;
-      fpsEl.textContent = FPS: ${fps};
+      fpsEl.textContent = `FPS: ${fps}`;
     } catch (err) {
       console.warn('detect err', err);
     }
@@ -443,7 +444,7 @@
     }
 
     // If the user asked something else, just show a tiny response
-    flashMessage(Query received: "${text}" — try "Where is the bottle?");
+    flashMessage(`Query received: "${text}" — try "Where is the bottle?"`);
   }
 
   function flashMessage(msg, timeout=2000) {
@@ -466,7 +467,7 @@
     const dist = parseFloat(distStr);
     if (!dist || dist <= 0) { alert('Invalid distance'); return; }
 
-    alert(Calibration: point the camera so the target ${className} fills the center of the view and press OK.);
+    alert(`Calibration: point the camera so the target ${className} fills the center of the view and press OK.`);
 
     // take one detection after short delay
     await new Promise(r => setTimeout(r, 1200));
@@ -486,7 +487,7 @@
     const real_h = referenceHeights[className] || parseFloat(prompt('Enter approx physical height in meters for this object:', '0.24'));
     if (!real_h || real_h <= 0) { alert('Invalid physical height'); return; }
     focal_px = (pixel_h * dist) / real_h;
-    distNote.textContent = calibrated (f=${Math.round(focal_px)});
+    distNote.textContent = `calibrated (f=${Math.round(focal_px)})`;
     alert('Calibration complete — distance estimates will be more accurate.');
   });
 
