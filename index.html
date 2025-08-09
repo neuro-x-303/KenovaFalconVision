@@ -1,507 +1,191 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html>
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Kenova Falcon Vision</title>
-
-<!-- TensorFlow.js + COCO-SSD -->
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.8.0/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
-
-<style>
-  :root{
-    --bg:#0b0b0d;
-    --panel:#121216;
-    --muted:#8b8b93;
-    --accent:#74f0ff;
-    --box:#7ef0ff;
-    --glass: rgba(255,255,255,0.03);
-    --card-shadow: 0 6px 20px rgba(0,0,0,0.6);
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  }
-  html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#060607);color:#ddd;}
-  .app {
-    display:grid;
-    grid-template-rows:auto 1fr auto;
-    gap:12px;
-    height:100vh;
-    padding:18px;
-    box-sizing:border-box;
-  }
-
-  header {
-    display:flex;
-    align-items:center;
-    gap:16px;
-    color:var(--muted);
-  }
-  .logo {
-    width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,#091217,#182026);display:flex;align-items:center;justify-content:center;
-    box-shadow:var(--card-shadow); border:1px solid rgba(255,255,255,0.03);
-  }
-  .logo h1{margin:0;font-size:15px;color:var(--accent);letter-spacing:0.6px;}
-  .brand {display:flex;flex-direction:column;}
-  .brand .title{font-weight:700;color:#eef7f9;font-size:18px;}
-  .brand .sub{font-size:12px;color:var(--muted);margin-top:2px;}
-
-  /* center stage - video + overlay */
-  .stage {
-    position:relative;
-    border-radius:12px;
-    overflow:hidden;
-    background:var(--panel);
-    border:1px solid rgba(255,255,255,0.03);
-    box-shadow:var(--card-shadow);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-  }
-
-  video#cam {
-    width:100%;
-    height:100%;
-    object-fit:cover;
-    transform: scaleX(-1); /* mirror for a front-camera feel */
-    -webkit-transform: scaleX(-1);
-  }
-
-  canvas#overlay {
-    position:absolute;
-    left:0; top:0;
-    width:100%; height:100%;
-    pointer-events:none;
-  }
-
-  /* control bar bottom */
-  .controls {
-    display:flex;
-    gap:12px;
-    align-items:center;
-    justify-content:space-between;
-  }
-  .left-controls {display:flex; gap:12px; align-items:center;}
-  .btn {
-    background:linear-gradient(180deg,#131316,#0f1113);
-    border:1px solid rgba(255,255,255,0.04);
-    color:#e8f9fb;
-    padding:10px 16px;
-    border-radius:12px;
-    cursor:pointer;
-    box-shadow:0 6px 18px rgba(0,0,0,0.6);
-    font-weight:600;
-    letter-spacing:0.3px;
-  }
-  .btn:active{transform:translateY(1px)}
-  .btn.start {background:linear-gradient(180deg,#0d9fa8,#057b80);color:#021617}
-  .small {padding:8px 10px;border-radius:10px;font-size:14px}
-
-  /* query input bottom center */
-  .query {
-    width:100%;
-    max-width:920px;
-    display:flex;
-    gap:10px;
-    align-items:center;
-  }
-  input#queryInput {
-    flex:1;
-    background:var(--glass);
-    border:1px solid rgba(255,255,255,0.04);
-    color:#e8f9fb;
-    padding:12px 14px;border-radius:12px;font-size:15px;
-    outline:none;
-    box-shadow: inset 0 -1px 0 rgba(0,0,0,0.3);
-  }
-  .chip {
-    background: rgba(126,240,255,0.06);
-    border: 1px solid rgba(126,240,255,0.12);
-    color: var(--box);
-    padding:8px 10px;border-radius:10px;font-weight:600;
-  }
-
-  /* status area */
-  .status {
-    font-size:13px;color:var(--muted);
-    display:flex;gap:12px;align-items:center;
-  }
-
-  /* message overlay when bottle found */
-  .message {
-    position:absolute;left:18px;top:18px;background:linear-gradient(90deg,#0f1012,#141619);
-    padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);
-    color:var(--muted);font-weight:600;
-  }
-
-  /* responsive */
-  @media (max-width:720px){
-    .app {padding:12px}
-    .brand .title{font-size:16px}
-  }
-</style>
+  <meta charset="utf-8">
+  <title>Kenova Falcon Vision</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <style>
+    body {
+      background: #111;
+      color: #eee;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    h1 {
+      margin: 10px;
+      color: #0ff;
+      font-size: 28px;
+      text-shadow: 0 0 5px #0ff, 0 0 15px #0ff;
+    }
+    #video {
+      border-radius: 10px;
+      margin-top: 10px;
+      display: none;
+    }
+    #popup {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.95);
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 10;
+      text-align: center;
+    }
+    #popup button {
+      background: #222;
+      color: #0ff;
+      padding: 12px 20px;
+      border: 2px solid #0ff;
+      border-radius: 8px;
+      font-size: 18px;
+      cursor: pointer;
+      margin-top: 15px;
+      text-shadow: 0 0 5px #0ff;
+    }
+    #popup button:hover {
+      background: #0ff;
+      color: #111;
+    }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    #queryBox {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      background: #222;
+      color: #fff;
+      border: 2px solid #555;
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 16px;
+      text-align: center;
+    }
+    /* Scanning line effect */
+    #scan-line {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: rgba(0, 255, 255, 0.5);
+      box-shadow: 0 0 15px #0ff;
+      animation: scan 3s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes scan {
+      0% { top: 0; }
+      100% { top: 100%; }
+    }
+  </style>
 </head>
 <body>
-  <div class="app">
-    <header>
-      <div class="logo"><h1>KF</h1></div>
-      <div class="brand">
-        <div class="title">Kenova Falcon Vision</div>
-        <div class="sub">Real-time object detection — Bottle focus • People detect</div>
-      </div>
+  <h1>Kenova Falcon Vision</h1>
 
-      <div style="flex:1"></div>
-
-      <div class="status" id="statusArea">
-        <div id="modelStatus">Model: <span style="color:var(--muted)">not loaded</span></div>
-        <div id="fps">FPS: —</div>
-      </div>
-    </header>
-
-    <main class="stage" id="stage" style="min-height:60vh">
-      <video id="cam" autoplay playsinline></video>
-      <canvas id="overlay"></canvas>
-      <div class="message" id="hint">Press <strong>Start</strong> to begin</div>
-    </main>
-
-    <footer class="controls">
-      <div class="left-controls">
-        <button class="btn start" id="startBtn">Start</button>
-        <div class="chip" id="modeChip">Mode: <span id="modeLabel">Bottle-only</span></div>
-        <button class="btn small" id="togglePeople">Toggle People</button>
-        <button class="btn small" id="calibrateBtn" title="Calibrate approximate distance">Calibrate</button>
-      </div>
-
-      <div style="flex:1;display:flex;justify-content:center">
-        <div class="query">
-          <input id="queryInput" placeholder='Ask (e.g. "Where is the bottle?")' />
-          <button class="btn small" id="askBtn">Ask</button>
-        </div>
-      </div>
-
-      <div style="width:220px; text-align:right;">
-        <div style="font-size:13px;color:var(--muted)">Distance estimation: <span id="distNote">approx.</span></div>
-        <div style="height:6px"></div>
-      </div>
-    </footer>
+  <div id="popup">
+    <h2>Grant Camera Access</h2>
+    <p>Kenova Falcon Vision needs your camera to detect objects in real-time.</p>
+    <button onclick="initCamera()">Grant Permission</button>
   </div>
 
-<script>
-(() => {
-  const video = document.getElementById('cam');
-  const canvas = document.getElementById('overlay');
-  const ctx = canvas.getContext('2d');
-  const startBtn = document.getElementById('startBtn');
-  const modelStatus = document.getElementById('modelStatus');
-  const fpsEl = document.getElementById('fps');
-  const modeLabel = document.getElementById('modeLabel');
-  const togglePeopleBtn = document.getElementById('togglePeople');
-  const hint = document.getElementById('hint');
-  const queryInput = document.getElementById('queryInput');
-  const askBtn = document.getElementById('askBtn');
-  const calibrateBtn = document.getElementById('calibrateBtn');
-  const distNote = document.getElementById('distNote');
+  <video id="video" width="640" height="480" autoplay muted></video>
+  <canvas id="canvas" width="640" height="480"></canvas>
+  <div id="scan-line"></div>
 
-  let model = null;
-  let running = false;
-  let bottleOnly = true; // initial requirement: app starts marking only bottle objects
-  let showPeople = true;  // user also wants to detect people
-  let lastTime = performance.now();
-  let fps = 0;
+  <input id="queryBox" type="text" placeholder="Ask me: e.g. Where is the bottle?">
 
-  // For rough distance estimation:
-  // We use a simple pinhole camera model:
-  // distance (m) = (real_object_height_m * focal_px) / object_pixel_height
-  // focal_px is unknown; we use a heuristic default and allow calibration.
-  let focal_px = 800; // heuristic default; change via calibrate
-  const referenceHeights = { // typical average heights for a few classes (meters)
-    'person': 1.7,
-    'bottle': 0.24, // ~24cm
-    'chair': 0.9,
-    'tv': 0.5,
-  };
+  <script>
+    let model;
+    let filterClass = null;
 
-  // Load COCO-SSD model (tfjs)
-  async function loadModel() {
-    modelStatus.innerHTML = 'Model: <span style="color:var(--muted)">loading…</span>';
-    // cocoSsd.load() returns a detector
-    model = await cocoSsd.load({base: 'lite_mobilenet_v2'});
-    modelStatus.innerHTML = 'Model: <span style="color:var(--accent)">ready</span>';
-  }
+    // Known real-world object heights in meters
+    const knownHeights = { "bottle": 0.25, "person": 1.7 };
+    const focalLength = 600; // camera focal length in px
 
-  // Setup camera access
-  async function startCamera() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-      });
-      video.srcObject = stream;
-      await new Promise(r => video.onloadedmetadata = r);
-      resizeCanvas();
-      window.addEventListener('resize', resizeCanvas);
-    } catch (err) {
-      alert('Camera error: ' + err.message + '. Grant camera permission and try again.');
-      console.error(err);
-    }
-  }
-
-  function resizeCanvas() {
-    // match canvas size to video display
-    const rect = video.getBoundingClientRect();
-    canvas.width = Math.round(rect.width);
-    canvas.height = Math.round(rect.height);
-  }
-
-  // draw boxes
-  function drawDetections(dets, filterTerm) {
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.save();
-    // mirror to match video transform
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
-
-    dets.forEach(d => {
-      const cls = d.class;
-      const score = d.score;
-      if (score < 0.4) return; // threshold
-      // filtering logic:
-      if (bottleOnly && !(cls === 'bottle')) {
-        // If bottle-only mode, draw only bottles.
-        if (cls !== 'person' || !showPeople) return;
-      }
-      // If query filter present (like "bottle")
-      if (filterTerm && !cls.includes(filterTerm)) {
-        if (cls !== 'person' || !showPeople) return;
-      }
-
-      // detection bounding box provided in model coords relative to video natural size.
-      // We need to scale to canvas size (video element is fit:cover so model bbox uses video width/height).
-      // model returns bbox in [x,y,width,height] relative to input image. We will scale using video element intrinsic size.
-      // Compute scale factors using video element dimensions vs model input (we approximate using video.videoWidth/video.videoHeight)
-      const vw = video.videoWidth || canvas.width;
-      const vh = video.videoHeight || canvas.height;
-      const sx = canvas.width / vw;
-      const sy = canvas.height / vh;
-
-      const [x, y, w, h] = d.bbox;
-      const bx = x * sx;
-      const by = y * sy;
-      const bw = w * sx;
-      const bh = h * sy;
-
-      // use square around the object as the user asked (we will draw a square with side = max(w,h))
-      const side = Math.max(bw, bh);
-      const cx = bx + bw/2;
-      const cy = by + bh/2;
-      const sx1 = cx - side/2;
-      const sy1 = cy - side/2;
-
-      // choose color for bottle vs person
-      let color = cls === 'bottle' ? 'rgba(126,240,255,0.95)' : (cls === 'person' ? 'rgba(255,180,120,0.95)' : 'rgba(140,200,255,0.85)');
-
-      // futuristic stroke
-      ctx.lineWidth = Math.max(2, Math.round(2 * (canvas.width/800)));
-      // outer glow
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 18;
-
-      // square border
-      ctx.strokeStyle = color;
-      roundRect(ctx, sx1, sy1, side, side, 6);
-      ctx.stroke();
-
-      ctx.shadowBlur = 0;
-      // label background
-      const label = `${cls} ${(score*100|0)}%`;
-      ctx.font = "600 14px Inter, Arial";
-      const textW = ctx.measureText(label).width;
-      const padding = 8;
-      const labelX = Math.max(6, sx1);
-      const labelY = Math.max(18, sy1 + 16);
-
-      ctx.fillStyle = 'rgba(2,8,10,0.7)';
-      roundRectFill(ctx, labelX - 6, labelY - 14, textW + padding, 22, 6);
-
-      // label text
-      ctx.fillStyle = '#eafcff';
-      ctx.fillText(label, labelX, labelY + 2);
-
-      // Draw estimated distance (approx)
-      const clsKey = cls in referenceHeights ? cls : null;
-      if (clsKey) {
-        const estimatedM = estimateDistanceMeters(referenceHeights[clsKey], bh);
-        const distStr = estimatedM ? `${estimatedM.toFixed(2)} m` : '—';
-        ctx.fillStyle = '#cfeef1';
-        ctx.fillText(distStr, labelX, labelY + 18);
-      }
+    document.getElementById("queryBox").addEventListener("input", function() {
+      let query = this.value.toLowerCase();
+      if (query.includes("bottle")) filterClass = "bottle";
+      else if (query.includes("person") || query.includes("people")) filterClass = "person";
+      else filterClass = null;
     });
 
-    ctx.restore();
-  }
-
-  // helper: rounded rect stroke
-  function roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
-  }
-  function roundRectFill(ctx, x, y, w, h, r) {
-    roundRect(ctx, x, y, w, h, r);
-    ctx.fill();
-  }
-
-  // Very rough distance estimation using pinhole model:
-  // real_h_m * focal_px / pixel_h
-  // focal_px adjustable via calibration. pixel_h is bounding box pixel height (bh).
-  function estimateDistanceMeters(realHeightMeters, pixelHeight) {
-    if (!pixelHeight || pixelHeight < 1) return null;
-    // pixelHeight is in canvas pixels; focal_px calibrated for canvas width ~1280
-    const distance = (realHeightMeters * focal_px) / pixelHeight;
-    return distance;
-  }
-
-  // main detection loop
-  async function detectionLoop(filterTerm) {
-    if (!model || !running) return;
-    // model.detect accepts video element and returns detections
-    try {
-      const t0 = performance.now();
-      const detections = await model.detect(video, 8); // max 8 detections for speed
-      const t1 = performance.now();
-      // draw
-      drawDetections(detections, filterTerm);
-      // fps calculation
-      const now = performance.now();
-      fps = Math.round(1000 / (now - lastTime));
-      lastTime = now;
-      fpsEl.textContent = `FPS: ${fps}`;
-    } catch (err) {
-      console.warn('detect err', err);
-    }
-    // schedule next iteration (allow browser to breathe)
-    if (running) requestAnimationFrame(() => detectionLoop(filterTerm));
-  }
-
-  // Start/Stop
-  startBtn.addEventListener('click', async () => {
-    if (!running) {
-      hint.style.display = 'none';
-      startBtn.textContent = 'Stop';
-      startBtn.classList.remove('start');
-      startBtn.style.background = 'linear-gradient(180deg,#2b2b2d,#1a1a1c)';
-      running = true;
-      if (!model) await loadModel();
-      if (!video.srcObject) await startCamera();
-      // default: start in bottle-only highlight mode
-      bottleOnly = true;
-      modeLabel.textContent = bottleOnly ? 'Bottle-only' : 'All objects';
-      // start loop
-      requestAnimationFrame(() => detectionLoop(null));
-    } else {
-      running = false;
-      startBtn.textContent = 'Start';
-      startBtn.classList.add('start');
-      // clear overlay
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      hint.style.display = '';
-    }
-  });
-
-  // ask/query handler
-  askBtn.addEventListener('click', handleQuery);
-  queryInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleQuery(); });
-
-  function handleQuery() {
-    const text = queryInput.value.trim().toLowerCase();
-    if (!text) return;
-    // simple natural-language matching for "where is the bottle"
-    if (text.includes('bottle')) {
-      bottleOnly = true;
-      modeLabel.textContent = 'Bottle-only (query)';
-      // keep highlighting bottles; the detection loop will highlight bottles
-      // to emphasize, show a temporary UI message
-      flashMessage('Searching for bottles…');
-      // pass filterTerm to detectionLoop by running one immediate pass
-      requestAnimationFrame(() => detectionLoop('bottle'));
-      // after a short time revert label if user hasn't toggled
-      setTimeout(() => {
-        if (bottleOnly) modeLabel.textContent = 'Bottle-only';
-      }, 2500);
-      return;
+    async function initCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        document.getElementById('video').srcObject = stream;
+        document.getElementById('popup').style.display = 'none';
+        document.getElementById('video').style.display = 'block';
+        loadModel();
+      } catch (err) {
+        alert("Camera access denied. Please enable it in browser settings.");
+      }
     }
 
-    if (text.includes('where') && text.includes('person')) {
-      // user asked about people
-      bottleOnly = false;
-      modeLabel.textContent = 'People & objects';
-      flashMessage('Searching for people…');
-      requestAnimationFrame(() => detectionLoop('person'));
-      return;
+    async function loadModel() {
+      model = await cocoSsd.load();
+      detectFrame();
     }
 
-    // If the user asked something else, just show a tiny response
-    flashMessage(`Query received: "${text}" — try "Where is the bottle?"`);
-  }
-
-  function flashMessage(msg, timeout=2000) {
-    hint.textContent = msg;
-    hint.style.display = 'block';
-    setTimeout(() => { if (hint.textContent === msg) hint.style.display = ''; }, timeout);
-  }
-
-  // toggle people display
-  togglePeopleBtn.addEventListener('click', () => {
-    showPeople = !showPeople;
-    togglePeopleBtn.textContent = showPeople ? 'People: ON' : 'People: OFF';
-  });
-
-  // Calibrate focal length: user points camera at a known object of known distance and enters distance meters.
-  calibrateBtn.addEventListener('click', async () => {
-    const className = prompt('Calibration target class (e.g. bottle or person):', 'bottle');
-    if (!className) return;
-    const distStr = prompt('Enter known distance to target in meters (e.g. 1.0):', '1.0');
-    const dist = parseFloat(distStr);
-    if (!dist || dist <= 0) { alert('Invalid distance'); return; }
-
-    alert(`Calibration: point the camera so the target ${className} fills the center of the view and press OK.`);
-
-    // take one detection after short delay
-    await new Promise(r => setTimeout(r, 1200));
-    if (!model) {
-      flashMessage('Model not loaded. Loading now…');
-      await loadModel();
+    function detectFrame() {
+      model.detect(video).then(predictions => {
+        renderPredictions(predictions);
+        requestAnimationFrame(detectFrame);
+      });
     }
-    const detections = await model.detect(video, 6);
-    // pick the largest matching detection
-    const found = detections.filter(d => d.class === className).sort((a,b) => (b.bbox[3] || 0) - (a.bbox[3] || 0))[0];
-    if (!found) {
-      alert('No matching object detected. Try again and make sure the object is visible.');
-      return;
+
+    function estimateDistance(objectClass, pixelHeight) {
+      if (!knownHeights[objectClass]) return null;
+      return ((knownHeights[objectClass] * focalLength) / pixelHeight).toFixed(2);
     }
-    const pixel_h = found.bbox[3] * (canvas.height / (video.videoHeight || canvas.height));
-    // compute focal_px = pixel_h * distance / real_height
-    const real_h = referenceHeights[className] || parseFloat(prompt('Enter approx physical height in meters for this object:', '0.24'));
-    if (!real_h || real_h <= 0) { alert('Invalid physical height'); return; }
-    focal_px = (pixel_h * dist) / real_h;
-    distNote.textContent = `calibrated (f=${Math.round(focal_px)})`;
-    alert('Calibration complete — distance estimates will be more accurate.');
-  });
 
-  // keep canvas in sync when video size changes
-  video.addEventListener('loadeddata', resizeCanvas);
-  video.addEventListener('play', resizeCanvas);
+    function renderPredictions(predictions) {
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = "14px Arial";
+      ctx.shadowColor = "#0ff";
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 2;
 
-  // simple helper to warm up: user may want instructions offline
-  window.addEventListener('load', () => {
-    // hint is visible by default
-    modelStatus.innerHTML = 'Model: <span style="color:var(--muted)">not loaded</span>';
-    togglePeopleBtn.textContent = 'People: ON';
-  });
-})();
-</script>
+      predictions.forEach(pred => {
+        if (filterClass && pred.class !== filterClass) return;
+        const [x, y, width, height] = pred.bbox;
+        const distance = estimateDistance(pred.class, height);
+
+        // Glowing neon box
+        ctx.strokeStyle = "#0ff";
+        ctx.beginPath();
+        ctx.rect(x, y, width, height);
+        ctx.stroke();
+
+        // Pulsing target circle
+        const centerX = x + width / 2;
+        const centerY = y + height / 2;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 10 + Math.sin(Date.now() / 200) * 5, 0, 2 * Math.PI);
+        ctx.stroke();
+
+        // Label
+        let label = `${pred.class} (${Math.round(pred.score * 100)}%)`;
+        if (distance) label += ` - ${distance}m`;
+        ctx.fillStyle = "#0ff";
+        ctx.fillText(label, x, y > 10 ? y - 5 : 10);
+      });
+    }
+  </script>
 </body>
 </html>
